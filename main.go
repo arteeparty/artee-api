@@ -1,68 +1,77 @@
 package main
 
 import (
+	"crypto"
+	"crypto/hmac"
+	_ "crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
-	"github.com/gorilla/websocket"
-	"log"
+	"fmt"
+	log "github.com/Sirupsen/logrus"
+	"github.com/joho/godotenv"
+	"github.com/mnbbrown/artee/datastore"
+	"github.com/mnbbrown/artee/routes"
+	"github.com/mnbbrown/engine"
+	"github.com/satori/go.uuid"
 	"net/http"
+	"os"
+	"strings"
+	"time"
 )
 
-var clients = make(map[*websocket.Conn]bool) // connected clients
-var broadcast = make(chan message)           // broadcast channel
-
-type message struct {
-	Username string `json:"username"`
-	Message  string `json:"message"`
-	Type     string `json:"type"`
+func generateTwilioAccessToken(accountSid string, apiKey string, apiSecret string) string {
+	now := time.Now().UTC().Unix()
+	payload := map[string]interface{}{
+		"jti": fmt.Sprintf("%s-%d", apiKey, now),
+		"iss": apiKey,
+		"sub": accountSid,
+		"exp": now + 3600,
+		"grants": map[string]interface{}{
+			"identity": fmt.Sprintf("api-%s", uuid.NewV4()),
+			"video": map[string]string{
+				"room": "test_room",
+			},
+		},
+	}
+	header := map[string]interface{}{
+		"typ": "JWT",
+		"cty": "twilio-fpa;v=1",
+		"alg": "HS256",
+	}
+	segments := []string{encodeSegment(header), encodeSegment(payload)}
+	signMe := strings.Join(segments, ".")
+	signature := sign(crypto.SHA256, signMe, []byte(apiSecret))
+	segments = append(segments, encodeBase64Url(signature))
+	token := strings.Join(segments, ".")
+	return token
 }
 
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true
-	},
+func sign(hash crypto.Hash, msg string, key []byte) []byte {
+	hasher := hmac.New(hash.New, key)
+	hasher.Write([]byte(msg))
+
+	return hasher.Sum(nil)
 }
 
-func handleMessages() {
-	for {
-		// Grab the next message from the broadcast channel
-		msg := <-broadcast
-		// Send it out to every client that is currently connected
-		for client := range clients {
-			err := client.WriteJSON(msg)
-			if err != nil {
-				log.Printf("error: %v", err)
-				client.Close()
-				delete(clients, client)
-			}
-		}
-	}
+func encodeSegment(data map[string]interface{}) string {
+	b, _ := json.Marshal(data)
+	return encodeBase64Url(b)
 }
 
-func handleConnections(w http.ResponseWriter, r *http.Request) {
-	// Upgrade initial GET request to a websocket
-	ws, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Printf("error %v", err)
-		return
-	}
-	// Make sure we close the connection when the function returns
-	defer ws.Close()
+func encodeBase64Url(data []byte) string {
+	return strings.TrimRight(base64.URLEncoding.EncodeToString(data), "=")
+}
 
-	// Register our new client
-	clients[ws] = true
-
-	for {
-		var msg message
-		// Read in a new message as JSON and map it to a Message object
-		err := ws.ReadJSON(&msg)
-		if err != nil {
-			log.Printf("error: %v", err)
-			delete(clients, ws)
-			break
-		}
-		// Send the newly received message to the broadcast channel
-		broadcast <- msg
-	}
+func handleToken(rw http.ResponseWriter, req *http.Request) {
+	accountSid := os.Getenv("TW_ACCOUNT_SID")
+	apiKey := os.Getenv("TW_API_KEY")
+	apiSecret := os.Getenv("TW_API_SECRET")
+	token := generateTwilioAccessToken(accountSid, apiKey, apiSecret)
+	rw.Header().Set("Content-Type", "application/json; charset=utf-8")
+	enc := json.NewEncoder(rw)
+	enc.Encode(&map[string]string{
+		"token": token,
+	})
 }
 
 func handleVersion(rw http.ResponseWriter, req *http.Request) {
@@ -74,10 +83,42 @@ func handleVersion(rw http.ResponseWriter, req *http.Request) {
 }
 
 func main() {
-	http.HandleFunc("/", handleVersion)
-	http.HandleFunc("/ws", handleConnections)
+	err := godotenv.Load()
+	if err != nil {
+		fmt.Println("No .env found. Skipping")
+	}
 
-	// Start listening for incoming chat messages
-	go handleMessages()
-	http.ListenAndServe(":8001", nil)
+	ds := datastore.NewDatastore(os.Getenv("DATABASE_URL"))
+	r := engine.NewRouter()
+	r.Use(ds.M())
+
+	r.Get("/", handleVersion)
+
+	s := r.SubRouter("/auth")
+	s.Post("/login", routes.HandleLogin)
+	s.Post("/confirm", routes.HandleConfirm)
+	s.Post("/register", routes.HandleRegister)
+
+	api := r.SubRouter("/api", routes.TokenVerificationMiddleware)
+	api.Get("/token", handleToken)
+
+	hub := newHub()
+	go hub.run()
+	http.Handle("/", engine.CORSAcceptAll(r))
+	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		serveWs(hub, w, r)
+	})
+
+	port := os.Getenv("PORT")
+	if len(port) == 0 {
+		port = "8001"
+	}
+	host, _ := os.Hostname()
+
+	log.WithFields(log.Fields{
+		"host": host,
+		"port": port,
+	}).Infoln("Listening for requests")
+
+	http.ListenAndServe(":"+port, nil)
 }
