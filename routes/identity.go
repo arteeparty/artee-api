@@ -50,7 +50,12 @@ func HandleLogin(rw http.ResponseWriter, req *http.Request) {
 	twilio := gotwilio.NewTwilioClient(os.Getenv("TW_ACCOUNT_SID"), os.Getenv("TW_AUTH_TOKEN"))
 	token := generateOTP()
 	message := fmt.Sprintf("Your artee party code is %s", token)
-	twilio.SendSMS("+61419297613", phone, message, "", "")
+	_, exception, err := twilio.SendSMS("+61419297613", phone, message, "", "")
+	if err != nil {
+		md.Logger().Printf("Failed to send message: %s (%s)\n", exception.Message, err)
+		engine.JSON(rw, &engine.J{"message": "Internal Server Error"}, http.StatusInternalServerError)
+		return
+	}
 
 	if user == nil {
 		userToSave := &datastore.User{
