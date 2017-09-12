@@ -36,7 +36,7 @@ deploy:
   provider: script
   skip_cleanup: true
   script:
-   - rsync -r --delete-after --quiet $TRAVIS_BUILD_DIR/build artee@api.artee.party:/home/artee
+   - scp $TRAVIS_BUILD_DIR/build/artee-api-linux64 artee@api.artee.party:/home/artee
    - sudo /bin/bash /home/mnbbrown/deploy.sh
   on:
     branch: master
