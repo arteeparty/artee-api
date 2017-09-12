@@ -51,7 +51,7 @@ func HandleLogin(rw http.ResponseWriter, req *http.Request) {
 	token := generateOTP()
 	message := fmt.Sprintf("Your artee party code is %s", token)
 	_, exception, err := twilio.SendSMS("+61419297613", phone, message, "", "")
-	if err != nil {
+	if err != nil || exception != nil {
 		md.Logger().Printf("Failed to send message: %s (%s)\n", exception.Message, err)
 		engine.JSON(rw, &engine.J{"message": "Internal Server Error"}, http.StatusInternalServerError)
 		return
