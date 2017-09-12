@@ -1,10 +1,11 @@
 package main
 
+// Message is a websocket message
 type Message struct {
 	Type    string `json:"type"`
 	Message string `json:"message"`
 }
 
-func (self *Message) String() string {
-	return self.Type + ": " + self.Message
+func (m *Message) String() string {
+	return m.Type + ": " + m.Message
 }
