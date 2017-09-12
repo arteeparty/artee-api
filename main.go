@@ -97,9 +97,9 @@ func main() {
 	s := r.SubRouter("/auth")
 	s.Post("/login", routes.HandleLogin)
 	s.Post("/confirm", routes.HandleConfirm)
-	s.Post("/register", routes.HandleRegister)
+	s.Post("/refresh", routes.HandleRefresh, routes.TokenVerificationMiddleware("refresh"))
 
-	api := r.SubRouter("/api", routes.TokenVerificationMiddleware)
+	api := r.SubRouter("/api", routes.TokenVerificationMiddleware("access"))
 	api.Get("/token", handleToken)
 
 	hub := newHub()

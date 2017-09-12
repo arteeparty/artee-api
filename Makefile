@@ -1,6 +1,8 @@
 NOW := $(shell date +"%s")
 DATABASE_URL := "postgresql://artee:ArteeParty2017@localhost:5432/artee?sslmode=disable"
 
+.PHONY: build
+
 clean:
 	rm -rf build/*
 

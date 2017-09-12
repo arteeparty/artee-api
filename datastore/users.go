@@ -15,6 +15,7 @@ type User struct {
 	HashedPassword    []byte    `json:"-"`
 	IdentityConfirmed bool      `json:"identity_confirmed"`
 	ConfirmationToken string    `json:"-"`
+	AuthTokenType     string    `json:"-"`
 	Created           time.Time `json:"created"`
 	Modified          time.Time `json:"modified"`
 }
@@ -90,7 +91,7 @@ func (u *UserService) GetUserByConfirmationToken(email, token string) (*User, er
 
 // InsertUser creates a new user
 func (u *UserService) InsertUser(user *User) error {
-	_, err := u.Exec("INSERT INTO users (name, phome, email, password) VALUES($1, $2, $3, $4)", user.Name, user.Phone, user.Email, user.HashedPassword)
+	_, err := u.Exec("INSERT INTO users (name, phone, email, password) VALUES($1, $2, $3, $4)", user.Name, user.Phone, user.Email, user.HashedPassword)
 	return err
 }
 
