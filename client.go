@@ -28,7 +28,6 @@ const (
 
 var (
 	newline = []byte{'\n'}
-	space   = []byte{' '}
 )
 
 var upgrader = websocket.Upgrader{
@@ -102,6 +101,9 @@ func (c *Client) writePump() {
 				return
 			}
 			err = json.NewEncoder(w).Encode(message)
+			if err != nil {
+				return
+			}
 
 			// Add queued chat messages to the current websocket message.
 			n := len(c.send)

@@ -1,8 +1,8 @@
 package datastore
 
 import (
-	"code.google.com/p/go.crypto/bcrypt"
 	"github.com/jmoiron/sqlx"
+	"golang.org/x/crypto/bcrypt"
 	"time"
 )
 

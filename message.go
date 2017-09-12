@@ -1,7 +1,6 @@
 package main
 
 type Message struct {
-	id      int
 	Type    string `json:"type"`
 	Message string `json:"message"`
 }

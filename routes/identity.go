@@ -101,21 +101,23 @@ func HandleConfirm(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	accessToken := jwt.New(jwt.SigningMethodHS256)
-	accessToken.Claims["id"] = user.ID
-	accessToken.Claims["phone"] = phone
-	accessToken.Claims["name"] = user.Name
-	accessToken.Claims["type"] = "access"
-	accessToken.Claims["nbf"] = time.Now().Unix()
-	accessToken.Claims["exp"] = time.Now().Add(time.Minute * 10).Unix()
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"id":    user.ID,
+		"phone": phone,
+		"name":  user.Name,
+		"type":  "access",
+		"nbf":   time.Now().Unix(),
+		"exp":   time.Now().Add(time.Minute * 10).Unix(),
+	})
 
-	refreshToken := jwt.New(jwt.SigningMethodHS256)
-	refreshToken.Claims["id"] = user.ID
-	refreshToken.Claims["phone"] = phone
-	refreshToken.Claims["name"] = user.Name
-	refreshToken.Claims["nbf"] = time.Now().Unix()
-	refreshToken.Claims["type"] = "refresh"
-	refreshToken.Claims["exp"] = time.Now().Add(time.Hour * 30 * 24).Unix()
+	refreshToken := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
+		"id":    user.ID,
+		"phone": phone,
+		"name":  user.Name,
+		"nbf":   time.Now().Unix(),
+		"type":  "refresh",
+		"exp":   time.Now().Add(time.Hour * 30 * 24).Unix(),
+	})
 
 	secret := os.Getenv("AUTH_SECRET")
 	if secret == "" {
@@ -152,13 +154,14 @@ func HandleRefresh(rw http.ResponseWriter, req *http.Request) {
 		return
 	}
 
-	accessToken := jwt.New(jwt.SigningMethodHS256)
-	accessToken.Claims["id"] = user.ID
-	accessToken.Claims["phone"] = user.Phone
-	accessToken.Claims["name"] = user.Name
-	accessToken.Claims["type"] = "access"
-	accessToken.Claims["nbf"] = time.Now().Unix()
-	accessToken.Claims["exp"] = time.Now().Add(time.Minute * 10).Unix()
+	accessToken := jwt.NewWithClaims(jwt.SigningMethodHS256, &jwt.MapClaims{
+		"id":    user.ID,
+		"phone": user.Phone,
+		"name":  user.Name,
+		"type":  "access",
+		"nbf":   time.Now().Unix(),
+		"exp":   time.Now().Add(time.Minute * 10).Unix(),
+	})
 
 	secret := os.Getenv("AUTH_SECRET")
 	if secret == "" {
@@ -225,12 +228,12 @@ func TokenVerificationMiddleware(tokenType string) engine.MiddlewareFunc {
 
 			if err == nil && token.Valid {
 
-				if token.Claims["type"] != tokenType {
+				if token.Claims.(jwt.MapClaims)["type"] != tokenType {
 					engine.JSON(rw, errors.New("Invalid token"), http.StatusUnauthorized)
 					return
 				}
 
-				user, err := datastore.FromContext(ctx).UserService.GetUser(token.Claims["id"].(string))
+				user, err := datastore.FromContext(ctx).UserService.GetUser(token.Claims.(jwt.MapClaims)["id"].(string))
 				if err != nil {
 					engine.JSON(rw, errors.New("Invalid Authorization header"), http.StatusUnauthorized)
 					return
