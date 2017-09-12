@@ -10,7 +10,7 @@ import (
 
 type key int
 
-const reqKey int = 0
+const reqKey key = 0
 
 // NewDatastore creates a new datastore
 func NewDatastore(dsn string) *Datastore {

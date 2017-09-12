@@ -45,7 +45,7 @@ func HandleLogin(rw http.ResponseWriter, req *http.Request) {
 	ctx := engine.GetContext(req)
 	md, _ := engine.GetMetadata(ctx)
 	userService := datastore.FromContext(ctx).UserService
-	user, err := userService.GetUserByPhone(phone)
+	user, _ := userService.GetUserByPhone(phone)
 
 	twilio := gotwilio.NewTwilioClient(os.Getenv("TW_ACCOUNT_SID"), os.Getenv("TW_AUTH_TOKEN"))
 	token := generateOTP()
@@ -58,7 +58,7 @@ func HandleLogin(rw http.ResponseWriter, req *http.Request) {
 			Name:  "TEMP_NAME",
 		}
 		userToSave.SetPassword(token)
-		err = userService.InsertUser(userToSave)
+		err := userService.InsertUser(userToSave)
 		if err != nil {
 			md.Logger().Println(err)
 			engine.JSON(rw, &engine.J{"message": "Internal Server Error"}, http.StatusInternalServerError)
@@ -66,7 +66,7 @@ func HandleLogin(rw http.ResponseWriter, req *http.Request) {
 		}
 		user = userToSave
 	} else {
-		err = userService.SetOTP(phone, token)
+		err := userService.SetOTP(phone, token)
 		if err != nil {
 			md.Logger().Println(err)
 			engine.JSON(rw, &engine.J{"message": "Internal Server Error"}, http.StatusInternalServerError)
