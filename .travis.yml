@@ -35,8 +35,6 @@ before_deploy:
 deploy:
   provider: script
   skip_cleanup: true
-  script:
-   - scp $TRAVIS_BUILD_DIR/build/artee-api-linux64 artee@api.artee.party:/home/artee
-   - sudo /bin/bash /home/mnbbrown/deploy.sh
+  script: sh scripts/deploy.sh
   on:
     branch: master
